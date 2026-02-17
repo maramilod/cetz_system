@@ -174,128 +174,94 @@ x-model="selectedSections['{{ $section->id }}'].selected">
 <script>
 function courseForm() {
     return {
-    courseType: '',
-    hasPractical: false,
+        selectedDepartments: [],
+        selectedSections: {},
+        startDate: '',
+        endDate: '',
+        semesters: [],
+        allowedSemesters: [],
+        degreeType: null,
+        periodLabel: '',
+        hasPractical: false,
 
-    selectedDepartments: [],
-    selectedSections: {},
-
-    startDate: '',
-    endDate: '',
-    semesters: [],
-
-    degreeType: null,
-    allowedSemesters: [],
-
-    periodLabel: '',
-
-
-     
-        // الدالة القديمة (تاريخ واحد)
-        fetchSemesters() {
-            if (!this.startDate) return;
-
-            fetch(`/semesters/by-start-date?start_date=${this.startDate}`)
-                .then(res => res.json())
-                .then(data => {
-                    this.semesters = data.semesters ?? [];
-                });
-        },
-
-        // ✅ الدالة الجديدة (من → إلى)
         fetchSemestersByRange() {
             if (!this.startDate || !this.endDate) return;
-       
-
             fetch(`/semesters/by-date-range?start_date=${this.startDate}&end_date=${this.endDate}`)
                 .then(res => res.json())
                 .then(data => {
                     this.semesters = data.semesters ?? [];
-                      if (this.semesters.length > 0) {
-                this.degreeType = this.semesters[0].degree_type;
-                this.buildSemesterRange();
-            }
-                    this.buildPeriodLabel();
-                })
-                .catch(err => console.error(err));
-                
+                    if (this.semesters.length > 0) {
+                        this.degreeType = this.semesters[0].degree_type;
+                        this.buildSemesterRange();
+                        this.buildPeriodLabel();
+                    }
+                });
         },
-         buildPeriodLabel() {
+
+        buildSemesterRange() {
+            this.allowedSemesters = [];
+            if (this.degreeType === 'بكالوريوس') {
+                for (let i = 2; i <= 8; i++) this.allowedSemesters.push(i);
+            }
+            if (this.degreeType === 'دبلوم') {
+                for (let i = 2; i <= 6; i++) this.allowedSemesters.push(i);
+            }
+
+            // تحديث الشعب العادية
+            for (const sectionId in this.selectedSections) {
+                if (!this.selectedSections[sectionId].semesters) this.selectedSections[sectionId].semesters = {};
+                this.allowedSemesters.forEach(s => {
+                    if (!(s in this.selectedSections[sectionId].semesters)) {
+                        this.selectedSections[sectionId].semesters[s] = false;
+                    }
+                });
+            }
+        },
+
+        buildPeriodLabel() {
             if (this.semesters.length === 0) {
                 this.periodLabel = '';
                 return;
             }
-
             const first = this.semesters[0];
-            const last  = this.semesters[this.semesters.length - 1];
-
+            const last = this.semesters[this.semesters.length - 1];
             const startYear = new Date(first.start_date).getFullYear();
-            const endYear   = new Date(last.end_date).getFullYear();
-
-            this.periodLabel = ` ${endYear} ${last.term_type}  → ${startYear} ${first.term_type} `;
+            const endYear = new Date(last.end_date).getFullYear();
+            this.periodLabel = `${endYear} ${last.term_type} → ${startYear} ${first.term_type}`;
         },
-        buildSemesterRange() {
-    this.allowedSemesters = [];
 
-    if (this.degreeType === 'بكالوريوس') {
-        // من 2 إلى 7 (6 سيمسترات)
-        for (let i = 2; i <=8; i++) {
-            this.allowedSemesters.push(i);
+        initSection(sectionId) {
+            if (!this.selectedSections[sectionId]) {
+                this.selectedSections[sectionId] = {
+                    selected: true,
+                    semesters: {}
+                };
+                this.allowedSemesters.forEach(s => {
+                    this.selectedSections[sectionId].semesters[s] = false;
+                });
+            }
+        },
+
+        handleGeneralDept(deptId, isGeneral) {
+            if (!isGeneral) return;
+
+            const checkbox = document.querySelector(`input[value="${deptId}"]`);
+            const sectionId = checkbox.dataset.sectionId;
+            if (!sectionId) return;
+
+            if (checkbox.checked) {
+                // الشعبة العامة دائمًا محددة مع سيمستر 1
+                this.selectedSections[sectionId] = {
+                    selected: true,
+                    semesters: { 1: true }
+                };
+            } else {
+                delete this.selectedSections[sectionId];
+            }
         }
     }
-
-    if (this.degreeType === 'دبلوم') {
-        // من 2 إلى 5 (4 سيمسترات)
-        for (let i = 2; i <= 6; i++) {
-            this.allowedSemesters.push(i);
-        }
-    }
-
-    // تحديث الشعب الموجودة
-    for (const deptId in this.selectedSections) {
-        for (const section in this.selectedSections[deptId]) {
-            this.selectedSections[deptId][section].semesters = {};
-            this.allowedSemesters.forEach(s => {
-                this.selectedSections[deptId][section].semesters[s] = false;
-            });
-        }
-    }
-},
-initSection(sectionId) {
-    if (!this.selectedSections[sectionId]) {
-        this.selectedSections[sectionId] = {
-            selected: false,
-            semesters: {}
-        };
-
-        this.allowedSemesters.forEach(s => {
-            this.selectedSections[sectionId].semesters[s] = false;
-        });
-    }
-},
-handleGeneralDept(deptId, isGeneral) {
-    if (!isGeneral) return; // تجاهل أي قسم غير عام
-    // تحقق مباشر من checkbox (checked)
-    const isChecked = document.querySelector(`input[value="${deptId}"]`);
-
-    const sectionId = isChecked.dataset.sectionId; 
-    if (!sectionId) return;
-if (isChecked.checked) {
-        this.selectedSections[sectionId] = {
-            selected: true,
-            semesters: { 1: true }
-        };
-    } else {
-        // القسم العام لم يعد محدد → احذف الشعبة
-        delete this.selectedSections[sectionId];
-    }
- 
 }
 
-
-
-    }
-}
 </script>
 
 

@@ -147,15 +147,12 @@ document.addEventListener('alpine:init', () => {
         departments: departmentsFromDb,
 
         columns: {
-            photo: 'الصورة الشخصية',
             full_name: 'الاسم الكامل',
             mother_name: 'اسم الأم',
             nationality: 'الجنسية',
-            gender: 'الجنس',
             year: 'سنة التسجيل',
             semester: 'الفصل الدراسي',
             student_number: 'الرقم الجامعي',
-            manual_number: 'الرقم اليدوي',
             national_id: 'الرقم الوطني',
             passport_number: 'رقم جواز السفر',
             bank_name: 'اسم المصرف',

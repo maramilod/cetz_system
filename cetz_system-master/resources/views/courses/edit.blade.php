@@ -2,137 +2,347 @@
 
 @section('content')
 
-<div class="max-w-7xl mx-auto space-y-6" x-data="materialForm()" x-init="init()">
+<div class="max-w-6xl mx-auto p-6 bg-white rounded shadow"
+     x-data="courseForm()"  x-init="initExistingData()">
 
-    {{-- العنوان --}}
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-800" x-text="course.id ? 'تعديل المادة' : 'إضافة مادة جديدة'"></h1>
-    </div>
+    <h1 class="text-2xl font-bold mb-4">تعديل مادة</h1>
 
-    {{-- الفورم --}}
-    <form @submit.prevent="submitForm" class="bg-white rounded-xl shadow-sm border p-4 space-y-6">
+    @if(session('success'))
+        <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
+            {{ session('success') }}
+        </div>
+    @endif
 
-        {{-- اسم المادة --}}
+    <form action="{{ route('courses.update', $course->id) }}"
+          method="POST"
+          class="space-y-6">
+        @csrf
+        @method('PUT')
+
+        <!-- اسم المادة -->
         <div>
-            <label class="block text-sm font-medium text-gray-700">اسم المادة</label>
-            <input type="text" x-model="form.name" class="border rounded w-full px-3 py-2" required>
+            <label class="block text-sm mb-1">اسم المادة</label>
+            <input type="text"
+                   name="name"
+                   value="{{ old('name', $course->name) }}"
+                   class="border rounded w-full px-3 py-2"
+                   required>
         </div>
 
-        {{-- رمز المادة --}}
+        <!-- رمز المادة -->
         <div>
-            <label class="block text-sm font-medium text-gray-700">رمز المادة</label>
-            <input type="text" x-model="form.course_code" class="border rounded w-full px-3 py-2" required>
+            <label class="block text-sm mb-1">رمز المادة</label>
+            <input type="text"
+                   name="course_code"
+                   value="{{ old('course_code', $course->course_code) }}"
+                   class="border rounded w-full px-3 py-2"
+                   required>
         </div>
 
-        {{-- الساعات والوحدات --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700">الساعات</label>
-                <input type="number" x-model="form.hours" class="border rounded w-full px-3 py-2" min="0" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700">الوحدات</label>
-                <input type="number" x-model="form.units" class="border rounded w-full px-3 py-2" min="0" required>
-            </div>
+        <!-- عدد الساعات -->
+        <div>
+            <label class="block text-sm mb-1">عدد الساعات</label>
+            <input type="number"
+                   name="hours"
+                   value="{{ old('hours', $course->hours) }}"
+                   min="0"
+                   class="border rounded w-full px-3 py-2"
+                   required>
         </div>
 
-        {{-- المادة السابقة --}}
+        <!-- عدد الوحدات -->
         <div>
-            <label class="block text-sm font-medium text-gray-700">المادة السابقة (اختياري)</label>
-            <select x-model="form.prerequisite_course_id" class="border rounded px-3 py-2 w-full">
+            <label class="block text-sm mb-1">عدد الوحدات</label>
+            <input type="number"
+                   name="units"
+                   value="{{ old('units', $course->units) }}"
+                   min="0"
+                   class="border rounded w-full px-3 py-2"
+                   required>
+        </div>
+
+        <!-- المادة السابقة -->
+        <div>
+            <label class="block text-sm mb-1">المادة السابقة (اختياري)</label>
+            <select name="prerequisite_course_id"
+                    class="border rounded w-full px-3 py-2">
                 <option value="">لا توجد مادة سابقة</option>
-                @foreach($allCourses as $c)
-                    <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->course_code }})</option>
+                @foreach($courses as $c)
+                    <option value="{{ $c->id }}"
+                        @selected($course->prerequisite_course_id == $c->id)>
+                        {{ $c->name }} ({{ $c->course_code }})
+                    </option>
                 @endforeach
             </select>
         </div>
 
-        {{-- المادة العملية --}}
-       <div>
-    <label class="inline-flex items-center">
-        <input type="checkbox" x-model="form.has_practical" class="form-checkbox">
-        <span class="ml-2">تحتوي على جزء عملي</span>
-    </label>
-</div>
-
-
-
-    
-
-        {{-- زر الحفظ --}}
-        <div class="mt-4">
-            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                حفظ المادة
-            </button>
+        <!-- عملي -->
+        <div class="flex items-center gap-2">
+            <input type="checkbox"
+                   name="has_practical"
+                   value="1"
+                   @checked($course->has_practical)>
+            <span class="text-sm">تحتوي على جزء عملي</span>
         </div>
+  <!-- زر حفظ البيانات الأساسية فقط -->
+    <button type="submit"
+            name="action"
+            value="basic"
+            formaction="{{ route('courses.updateBasic', $course->id) }}"
+            class="bg-green-600 text-white px-6 py-2 rounded">
+        حفظ البيانات الأساسية فقط
+    </button>
+        <!-- فترة الدراسة -->
+        <div>
+            <label class="block text-sm mb-1">تاريخ بدء الفصل</label>
+            <select name="start_date"
+                    x-model="startDate"
+                    @change="fetchSemestersByRange"
+                    class="border rounded w-full px-3 py-2">
+                <option value="">اختر تاريخ البداية</option>
+                @foreach($startDates as $date)
+                    <option value="{{ $date }}">{{ $date }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm mb-1">تاريخ نهاية الفصل</label>
+            <select name="end_date"
+                    x-model="endDate"
+                    @change="fetchSemestersByRange"
+                    class="border rounded w-full px-3 py-2">
+                <option value="">اختر تاريخ النهاية</option>
+                @foreach($endDates as $date)
+                    <option value="{{ $date }}">{{ $date }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div x-show="periodLabel" class="mt-2">
+            <label class="block text-sm mb-1">الفترة الدراسية</label>
+            <input type="text"
+                   x-model="periodLabel"
+                   readonly
+                   class="border rounded w-full px-3 py-2 bg-gray-100">
+        </div>
+
+        <!-- الأقسام -->
+        <div>
+            <h2 class="text-lg font-semibold mb-3">
+                الأقسام والشعب والسيمسترات
+            </h2>
+
+            @foreach($departments as $dept)
+                <div class="border rounded p-4 mb-4">
+
+                    <!-- اختيار القسم -->
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox"
+                               value="{{ $dept->id }}"
+                               data-section-id="{{ $dept->is_general ? $dept->sections->first()->id : '' }}"
+                               x-model="selectedDepartments"
+                               @change="handleGeneralDept({{ $dept->id }}, {{ $dept->is_general ? 'true' : 'false' }})">
+
+                        <strong>{{ $dept->name }}</strong>
+
+                        @if($dept->is_general)
+                            <span class="text-xs text-green-600">(عام)</span>
+                        @endif
+                    </label>
+
+                    <!-- الشعب فقط إذا لم يكن عام -->
+                    @if(!$dept->is_general)
+                        @foreach($sections->where('department_id', $dept->id) as $section)
+                            <div class="ml-4 mt-3">
+
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox"
+                                           @click="initSection('{{ $section->id }}')"
+                                           x-model="selectedSections['{{ $section->id }}']?.selected">
+                                    {{ $section->name }}
+                                </label>
+
+                                <div x-show="selectedSections['{{ $section->id }}']?.selected"
+                                     class="ml-6 mt-2">
+
+                                    <label class="block text-sm mb-1">السيمسترات</label>
+
+                                    <template x-for="sem in allowedSemesters" :key="sem">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <input type="checkbox"
+                                                   x-model="selectedSections['{{ $section->id }}'].semesters[sem]">
+                                            سيمستر <span x-text="sem"></span>
+                                        </div>
+                                    </template>
+                                </div>
+
+                            </div>
+                        @endforeach
+                    @endif
+
+                </div>
+            @endforeach
+        </div>
+
+        <input type="hidden"
+               name="selectedSections"
+               :value="JSON.stringify(selectedSections)">
+
+        <button type="submit"
+                class="bg-blue-600 text-white px-6 py-2 rounded">
+            حفظ جميع التعديلات
+        </button>
 
     </form>
 </div>
 
 <script>
-function csrf() {
-    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-}
+function courseForm() {
+    return {
 
-document.addEventListener('alpine:init', () => {
-    Alpine.data('materialForm', () => ({
-        course: @json($course),
-        allCourses: @json($allCourses),
+        selectedDepartments: [],
+        selectedSections: {},
 
-        form: {
-            course_id: @json($course->id ?? null),
-            name: @json($course->name ?? ''),
-            course_code: @json($course->course_code ?? ''),
-            hours: @json($course->hours ?? 0),
-            units: @json($course->units ?? 0),
-            has_practical: @json($course->has_practical ?? 0),
-            prerequisite_course_id: @json($course->prerequisite_course_id ?? ''),
+        startDate: '',
+        endDate: '',
+        semesters: [],
+        allowedSemesters: [],
+        degreeType: null,
+        periodLabel: '',
+
+        /* =========================
+           تحميل البيانات القديمة
+        ========================== */
+        initExistingData() {
+
+            const existing = @json(
+                $course->offerings->load('semester')->groupBy('section_id')
+            );
+
+            for (const sectionId in existing) {
+
+                this.selectedSections[sectionId] = {
+                    selected: true,
+                    semesters: {}
+                };
+
+                existing[sectionId].forEach(off => {
+                    this.selectedSections[sectionId]
+                        .semesters[off.semester.semester_number] = true;
+                });
+            }
 
         },
 
-        init() {
-            // أي إعدادات إضافية هنا
+        /* =========================
+           جلب السيمسترات حسب الفترة
+        ========================== */
+        fetchSemestersByRange() {
+
+            if (!this.startDate || !this.endDate) return;
+
+            fetch(`/semesters/by-date-range?start_date=${this.startDate}&end_date=${this.endDate}`)
+                .then(res => res.json())
+                .then(data => {
+
+                    this.semesters = data.semesters ?? [];
+
+                    if (this.semesters.length > 0) {
+                        this.degreeType = this.semesters[0].degree_type;
+                        this.buildSemesterRange();
+                        this.buildPeriodLabel();
+                    }
+
+                });
         },
-submitForm() {
-    // تحويل القيم الرقمية إلى أرقام
-    const payload = {
-        ...this.form,
-                has_practical: this.form.has_practical ? 1 : 0, // تحويل Boolean إلى 0/1
 
+        /* =========================
+           تحديد مدى السيمسترات
+        ========================== */
+        buildSemesterRange() {
 
-        hours: Number(this.form.hours),
-        units: Number(this.form.units),
-        has_practical: this.form.has_practical ? 1 : 0,
-        prerequisite_course_id: this.form.prerequisite_course_id || null
-    };
+            this.allowedSemesters = [];
 
-    fetch(`{{ route('courses.update', $course->id) }}`, {
-        method: 'PATCH',
-        headers: {
-            'X-CSRF-TOKEN': csrf(),
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            if (this.degreeType === 'بكالوريوس') {
+                for (let i = 2; i <= 8; i++) {
+                    this.allowedSemesters.push(i);
+                }
+            }
+
+            if (this.degreeType === 'دبلوم') {
+                for (let i = 2; i <= 6; i++) {
+                    this.allowedSemesters.push(i);
+                }
+            }
+
         },
-        body: JSON.stringify(payload)
-    })
-    .then(res => {
-        if (!res.ok) return res.json().then(err => { throw err });
-        return res.json();
-    })
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            window.location.reload();
+
+        /* =========================
+           عرض الفترة
+        ========================== */
+        buildPeriodLabel() {
+
+            if (this.semesters.length === 0) {
+                this.periodLabel = '';
+                return;
+            }
+
+            const first = this.semesters[0];
+            const last  = this.semesters[this.semesters.length - 1];
+
+            const startYear = new Date(first.start_date).getFullYear();
+            const endYear   = new Date(last.end_date).getFullYear();
+
+            this.periodLabel =
+                `${endYear} ${last.term_type} → ${startYear} ${first.term_type}`;
+        },
+
+        /* =========================
+           تهيئة شعبة عادية
+        ========================== */
+        initSection(sectionId) {
+
+            if (!this.selectedSections[sectionId]) {
+
+                this.selectedSections[sectionId] = {
+                    selected: true,
+                    semesters: {}
+                };
+
+                this.allowedSemesters.forEach(s => {
+                    this.selectedSections[sectionId].semesters[s] = false;
+                });
+            }
+        },
+
+        /* =========================
+           التعامل مع القسم العام
+        ========================== */
+        handleGeneralDept(deptId, isGeneral) {
+
+            if (!isGeneral) return;
+
+            const checkbox = document.querySelector(`input[value="${deptId}"]`);
+            const sectionId = checkbox.dataset.sectionId;
+
+            if (!sectionId) return;
+
+            if (checkbox.checked) {
+
+                this.selectedSections[sectionId] = {
+                    selected: true,
+                    semesters: { 1: true }
+                };
+
+            } else {
+
+                delete this.selectedSections[sectionId];
+            }
         }
-    })
-    .catch(err => {
-        console.error(err);
-        alert('خطأ في الحفظ: تحقق من البيانات.');
-    });
-}
 
-    }));
-});
+    }
+}
 </script>
 
 @endsection

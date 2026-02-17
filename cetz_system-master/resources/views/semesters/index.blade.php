@@ -41,7 +41,7 @@
             <input type="date" name="end_at" class="border rounded px-3 py-2 w-full" required>
         </div>
         <div>
-            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">إضافة الحزمة</button>
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">إضافة الفصل</button>
         </div>
     </form>
     <div class="grid grid-cols-2 gap-4">
@@ -50,7 +50,7 @@
 
         <!-- قائمة الحزم المفعلة -->
         <div class="bg-white p-4 rounded shadow mt-6">
-            <h2 class="text-lg font-semibold mb-2">الحزم المفعلة حاليًا</h2>
+            <h2 class="text-lg font-semibold mb-2">الفصل المفعل حاليًا</h2>
 
             @if($activePackages->isNotEmpty())
             @foreach($activePackages as $activePackage)
@@ -81,25 +81,25 @@
                     <input type="hidden" name="start_date" value="{{ $activePackage->start_date }}">
                     <input type="hidden" name="end_date" value="{{ $activePackage->end_date }}">
                     <button type="submit" class="bg-red-600 text-white px-2 py-1 rounded"
-                        onclick="return confirm('هل تريد حذف الحزمة المفعلة؟')">
+                        onclick="return confirm('هل تريد حذف الفصل المفعل؟')">
                         حذف
                     </button>
                 </form>
             </div>
             @endforeach
             @else
-            <p class="text-gray-600">لا توجد حزم مفعلة حاليًا</p>
+            <p class="text-gray-600">لا يوجد فصل مفعل حاليًا</p>
             @endif
         </div>
 
         <div class="bg-white p-4 rounded shadow mt-6">
-            <h2 class="text-lg font-semibold mb-4">تفعيل حزمة جديدة</h2>
+            <h2 class="text-lg font-semibold mb-4">تفعيل فصل جديد</h2>
 
             <form action="{{ route('semesters.activate') }}" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <select name="package" required class="border rounded px-3 py-2 w-full">
-                        <option value="">اختر الحزمة</option>
+                        <option value="">اختر الفصل</option>
                         @foreach ($package as $p)
                         <option value="{{ $p->degree_type }}|{{ $p->term_type }}|{{ $p->start_date }}|{{ $p->end_date }}">
                             {{ $p->degree_type }} – {{ $p->term_type }} ({{ $p->start_date }} → {{ $p->end_date }})
@@ -109,7 +109,7 @@
                 </div>
 
                 <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-                    تفعيل الحزمة
+                    تفعيل الفصل
                 </button>
             </form>
         </div>
@@ -117,14 +117,17 @@
 <div class="bg-red-50 border border-red-300 p-4 rounded shadow mt-6">
     <h2 class="text-lg font-semibold text-red-700 mb-2">إجراءات إدارية حساسة</h2>
 
-    <form action="{{ route('students.freezeAll') }}" method="POST"
-onsubmit="return confirm('⚠️ هل أنت متأكدة؟ لا يمكن التراجع عن هذا الإجراء بسهولة. يُستخدم هذا الخيار عند انتهاء جميع إجراءات الفصل الدراسي السابق وبدء فصل دراسي جديد كليًا.');"
+<form action="{{ route('students.freezeAll') }}" method="POST"
+    onsubmit="return confirm('⚠️ هل أنت متأكدة؟ لا يمكن التراجع عن هذا الإجراء بسهولة. يُستخدم هذا الخيار عند انتهاء جميع إجراءات الفصل الدراسي السابق وبدء فصل دراسي جديد كليًا.');">
+    
+    @csrf
 
-        @csrf
-        <button type="submit"
-            class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
-            🚫 جهاز تجديد القيد        </button>
-    </form>
+    <button type="submit"
+        class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+        🚫 جهاز قيد الطالب
+    </button>
+</form>
+
 </div>
 
     </div>

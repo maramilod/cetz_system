@@ -21,6 +21,7 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\TeachingAssignmentController;
+use App\Http\Controllers\TeacherRankController;
 use App\Http\Controllers\GraduationProjectController;
 use App\Http\Controllers\AlertController;
 use App\Http\Middleware\PermissionMiddleware;
@@ -107,6 +108,25 @@ Route::get('/dashboard/active', [DashboardAnalyticsController::class, 'activeVie
     Route::delete('/teachers/{teacher}', [TeacherController::class, 'destroy'])->name('teachers.destroy')->middleware(PermissionMiddleware::class.':teachers.delete');
     Route::patch('/teachers/{teacher}/toggle-active', [TeacherController::class, 'toggleActive'])
     ->name('teachers.toggle-active')->middleware(PermissionMiddleware::class.':teachers.toggle');
+
+    Route::post('/teachers/{teacher}/rank', [TeacherRankController::class, 'store'])
+    ->name('teachers.rank.store');
+
+    Route::get('/teachers/{teacher}/promotion', [TeacherController::class, 'promotionForm'])
+    ->name('teachers.promotion')
+    ->middleware(PermissionMiddleware::class.':teachers.update');
+
+Route::post('/teachers/{teacher}/promotion',
+    [TeacherRankController::class, 'store']
+)->name('teachers.promotion.store')
+    ->middleware(PermissionMiddleware::class.':teachers.update');
+
+    // تقرير شامل لجميع الأساتذة
+//Route::get('/teachers/print', [TeacherController::class, 'printReport'])->name('teachers.printAll');
+
+// تقرير لكل أستاذ
+//Route::get('/teachers/{teacher}/print', [TeacherController::class, 'printReport'])->name('teachers.printSingle');
+
 /*
     |--------------------------------------------------------------------------
     | Courses / Teaching Assignments / Enrollment
@@ -134,10 +154,18 @@ Route::get('/dashboard/active', [DashboardAnalyticsController::class, 'activeVie
     ->name('courses.drop')->middleware(PermissionMiddleware::class.':courses.drop');
     Route::patch('/courses/{id}/restore', [CourseController::class, 'restore'])
     ->name('courses.restore')->middleware(PermissionMiddleware::class.':courses.restore');
+Route::get('/course-offerings/{id}/alternatives', [CourseController::class, 'alternatives']);
 
-    Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])
-    ->name('courses.edit')->middleware(PermissionMiddleware::class.':courses.update');
-    Route::patch('/coursess/{course}', [CourseController::class, 'update'])->name('courses.update')->middleware(PermissionMiddleware::class.':teachers.update');
+
+Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])->name('courses.edit');
+Route::put('/courses/{course}', [CourseController::class, 'update'])->name('courses.update');
+Route::put('/courses/{id}/update-basic', [CourseController::class, 'updateBasic'])
+    ->name('courses.updateBasic');
+
+    Route::patch(
+    '/courses/{course}/update-semester-assignments',
+    [CourseController::class, 'updateSemesterAssignments']
+);
 
     Route::delete('/enrollment/{id}', [CourseController::class, 'deleteEnrollment'])->name('courses.enrollment.delete');
 /*
@@ -170,11 +198,11 @@ Route::get('/dashboard/active', [DashboardAnalyticsController::class, 'activeVie
     */
     Route::prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'index'])->middleware(PermissionMiddleware::class.':users.view'); 
-        Route::post('/', [UserController::class, 'store'])->middleware(PermissionMiddleware::class.':users.create');
+        Route::post('/', [UserController::class, 'store']);
         Route::put('/{user}/toggle', [UserController::class, 'toggleStatus'])->middleware(PermissionMiddleware::class.':users.toggle');
-        Route::delete('/{user}', [UserController::class, 'destroy'])->middleware(PermissionMiddleware::class.':users.delete');
+        Route::delete('/{user}', [UserController::class, 'destroy']);
     });
-    Route::get('/users-page', [UserController::class, 'showPage'])->name('users.index')->middleware(PermissionMiddleware::class.':users.view');
+    Route::get('/users-page', [UserController::class, 'showPage'])->name('users.index');
 /*
     |--------------------------------------------------------------------------
     | Roles & Permissions
@@ -186,7 +214,7 @@ Route::get('/dashboard/active', [DashboardAnalyticsController::class, 'activeVie
         Route::put('/{role}', [RoleController::class, 'update']);       
         Route::delete('/{role}', [RoleController::class, 'destroy']);   
     });
-    Route::get('/roles-page', [RoleController::class, 'showPage'])->name('roles.index')->middleware(PermissionMiddleware::class.':permissions.view');
+    Route::get('/roles-page', [RoleController::class, 'showPage'])->name('roles.index');
 
 /*
     |--------------------------------------------------------------------------
@@ -238,6 +266,8 @@ Route::get('/dashboard/active', [DashboardAnalyticsController::class, 'activeVie
 */
     Route::get('download-materials/print', [MaterialDownloadController::class, 'print'])->name('materials.download.print');
     Route::get('download-materials', [MaterialDownloadController::class, 'index'])->name('materials.download');
+// routes/web.php
+Route::get('download-materials/students/search', [MaterialDownloadController::class, 'search'])->name('students.search');
 
     Route::post('/enrollments', [EnrollmentController::class, 'store']);
     Route::delete('/enrollments/{id}', [EnrollmentController::class, 'destroy']);

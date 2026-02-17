@@ -12,92 +12,110 @@ class MaterialDownloadController extends Controller
 {
 
 
-    public function index()
-    {
-        // جلب الطلاب مع القسم والشعبة
-    $students = Student::with(['section.department'])
-    ->get()
-    ->map(function ($s) {
-        $enrollments = Enrollment::where('student_id', $s->id)
-->whereIn('status', ['in_progress', 'passed'])
-            ->with('courseOffering.course')
-            ->get()
-            ->map(function($e) {
-                return [
-                    'id' => $e->id,
-                    'status' => $e->status,
-                    'course' => [
-                        'name' => $e->courseOffering?->course?->name,
-                        'code' => $e->courseOffering?->course?->course_code,
-                        'hours' => $e->courseOffering?->course?->hours,
-                        'units' => $e->courseOffering?->course?->units,
-                    ]
-                ];
-            });
+public function index()
+{
+    return view('materials.download');
+}
 
-        return [
-            'id' => $s->id,
-            'number' => $s->student_number ?? $s->manual_number,
-            'name' => $s->full_name,
-            'department_name' => $s->section?->department?->name,
-            'section_name' => $s->section?->name,
-            'section_id' => $s->section?->id,
-            'enrollments' => $enrollments->isNotEmpty() ? $enrollments : null,
-            'current_status'=> $s->current_status,
-        ];
-    });
+public function search(Request $request)
+{
+    $query = trim($request->input('query'));
 
+    // 1️⃣ البحث عن الطالب وتضمين القسم والتسجيلات
+    $student = Student::where('current_status', 'تم التجديد')
+        ->where(function ($q) use ($query) {
+            $q->where('student_number', $query)
+              ->orWhere('manual_number', $query)
+              ->orWhere('full_name', 'like', "%{$query}%");
+        })
+        ->with([
+            'section',
+            'section.department',
+            'enrollments' => function ($q) {
+                $q->whereIn('status', ['in_progress', 'passed'])
+                  ->with('courseOffering.course', 'courseOffering.semester');
+            }
+        ])
+        ->first();
 
-
-        // الأقسام النشطة
-        $departments = Department::where('is_active', 1)->get();
-
-$semesters = Semester::where('active', 1)
-    ->get()
-    ->map(function ($s) {
-        return [
-            'id'         => $s->id,
-            'label'      => $s->name,        
-            'start_date' => date('Y', strtotime($s->start_date)), 
-            'term_type'  => $s->term_type,   
-        ];
-    });
-
-
-
-    if (!$semesters) {
-        return view('materials.download', [
-            'students' => collect(),
-            'departments' => Department::where('is_active', 1)->get(),
-            'semesters' => collect(),
-            'materials' => collect(),
+    // إذا لم يوجد الطالب
+    if (!$student) {
+        return response()->json([
+            'student' => null,
+            'available_semesters' => [],
+            'available_materials' => [],
         ]);
     }
 
-$materials = CourseOffering::with(['course', 'section', 'semester'])->get()->map(function($offering){
-    return [
-        'id'          => $offering->id,
-        'section_id'  => $offering->section_id,
-        'semester_id' => $offering->semester_id,
-        'code'        => $offering->course->course_code,
-        'name'        => $offering->course->name,
-        'status'=> $offering->status, 
-        'units'       => $offering->course->units,
-        'hours'       => $offering->course->hours,
-        'section_name'=> $offering->section?->name,
-        'semester_name'=> $offering->semester?->name,
-    ];
-});
+    // 2️⃣ قائمة المواد المسجلة بالفعل للطالب
+    $blockedCourseIds = $student->enrollments
+        ->pluck('courseOffering.course_id')
+        ->filter()
+        ->unique();
+
+    // 3️⃣ المواد المتاحة للطالب حسب شعبة الطالب والفصول الفعالة
+    $availableMaterials = CourseOffering::with(['course', 'semester'])
+        ->where('status', 'active')
+        ->where('section_id', $student->section_id)
+        ->whereHas('semester', fn($q) => $q->where('active', 1))
+        ->when($blockedCourseIds->isNotEmpty(), function ($q) use ($blockedCourseIds) {
+            $q->whereNotIn('course_id', $blockedCourseIds);
+        })
+        ->get();
+
+    // 4️⃣ الفصول المتاحة (فقط الفصول التي تحتوي على مواد)
+    $availableSemesters = $availableMaterials
+        ->pluck('semester')
+        ->unique('id')
+        ->values()
+        ->map(fn($s) => [
+            'id' => $s->id,
+            'label' => $s->name,
+            'start_date' => date('Y', strtotime($s->start_date)),
+            'term_type' => $s->term_type,
+        ]);
+
+    // 5️⃣ تجهيز المواد للواجهة
+    $materials = $availableMaterials->map(fn($o) => [
+        'id' => $o->id,
+        'semester_id' => $o->semester_id,
+        'code' => $o->course?->course_code,
+        'name' => $o->course?->name,
+        'units' => $o->course?->units,
+        'hours' => $o->course?->hours,
+        'status' => $o->status
+    ]);
+
+    // 6️⃣ تجهيز تسجيلات الطالب الحالية
+    $enrollments = $student->enrollments->map(fn($e) => [
+        'id' => $e->id,
+        'status' => $e->status,
+        'course_offering_id' => $e->courseOffering?->id,
+        'semester_id' => $e->courseOffering?->semester_id,
+        'course' => [
+            'code' => $e->courseOffering?->course?->course_code,
+            'name' => $e->courseOffering?->course?->name,
+            'units' => $e->courseOffering?->course?->units,
+            'hours' => $e->courseOffering?->course?->hours,
+        ],
+    ]);
+
+    // 7️⃣ الإرجاع كـ JSON جاهز للواجهة
+    return response()->json([
+        'student' => [
+            'id' => $student->id,
+            'full_name' => $student->full_name,
+            'student_number' => $student->student_number,
+            'section_id' => $student->section_id,
+            'section_name' => $student->section?->name,
+            'department_name' => $student->section?->department?->name,
+            'enrollments' => $enrollments,
+        ],
+        'available_semesters' => $availableSemesters,
+        'available_materials' => $materials,
+    ]);
+}
 
 
- return view('materials.download', [
-
-    'students'    => $students,
-    'departments' => $departments,
-    'semesters'   => $semesters,
-    'materials'   => $materials,
-]);
-
-    }
 
 }

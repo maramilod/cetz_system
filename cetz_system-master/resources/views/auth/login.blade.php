@@ -9,10 +9,7 @@
 <body class="bg-beige-100 flex items-center justify-center h-screen">
 
     <div class="w-full max-w-sm bg-beige-50 p-6 rounded shadow-lg text-right border border-red-600">
-        <!-- شعار الكلية -->
-        <div class="flex justify-center mb-4">
-            <img src="{{ asset('images/college-logo.png') }}" alt="شعار الكلية" class="w-24 h-24 object-contain">
-        </div>
+      
 
         <h1 class="text-2xl font-bold mb-6 text-red-700 text-center">تسجيل الدخول</h1>
 

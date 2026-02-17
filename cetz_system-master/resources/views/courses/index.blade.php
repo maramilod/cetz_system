@@ -157,11 +157,52 @@ $seen = [];
 
 
 
+  
+
+
+
+<!-- Modal نقل التسجيلات -->
+<div x-show="showTransferModal"
+     x-transition
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+
+        <h2 class="text-lg font-bold mb-4 text-gray-800">
+            نقل تسجيلات الطلاب
+        </h2>
+
+        <p class="text-sm text-gray-600 mb-3">
+            يوجد طلاب مسجلين في هذه المادة.
+            اختر عرضاً بديلاً لنقل التسجيلات إليه.
+        </p>
+
+        <select x-model="selectedNewOffering"
+                class="w-full border rounded-lg px-3 py-2 mb-4">
+            <option value="">اختر عرض بديل</option>
+            <template x-for="o in alternativeOfferings" :key="o.id">
+              <option :value="o.id"
+        x-text="o.course_code + ' - ' + o.course_name + ' | ' + o.section_name + ' - ' + o.semester_name">
+</option>
+
+            </template>
+        </select>
+
+        <div class="flex justify-end gap-2">
+            <button class="px-4 py-2 bg-gray-300 rounded"
+                    @click="showTransferModal = false">
+                إلغاء
+            </button>
+
+            <button class="px-4 py-2 bg-red-600 text-white rounded"
+                    @click="confirmTransfer()">
+                نقل وحذف
+            </button>
+        </div>
+
     </div>
-
 </div>
-
-
+</div>
  <script>
 function csrf() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -170,6 +211,11 @@ function csrf() {
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('materialsAssign', () => ({
+        showTransferModal: false,
+selectedNewOffering: '',
+alternativeOfferings: [],
+currentDeletingMaterial: null,
+
       departments: @json($departments),
 sections: @json($sections),
 materials: @json($materials),
@@ -218,28 +264,58 @@ restoreMaterial(m) {
     });
 },
 deleteMaterial(m) {
-    if (!confirm(`تحذير!\nسيتم حذف المادة "${m.name}" نهائيًا`)) return;
+
+    if (!confirm(`تحذير!\nسيتم حذف المادة "${m.name}"`)) return;
+
+    fetch(`/course-offerings/${m.id}/alternatives`)
+        .then(res => res.json())
+        .then(data => {
+
+            if (data.length > 0) {
+                // يوجد تسجيلات → افتح المودل
+                this.alternativeOfferings = data;
+                this.currentDeletingMaterial = m;
+                this.showTransferModal = true;
+            } else {
+                // لا يوجد تسجيلات → حذف مباشر
+                this.forceDelete(m, null);
+            }
+        });
+},
+forceDelete(m, newOfferingId) {
 
     fetch(`/courses/${m.id}`, {
         method: 'DELETE',
         headers: {
             'X-CSRF-TOKEN': csrf(),
-            'Accept': 'application/json'
-        }
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            new_offering_id: newOfferingId
+        })
     })
     .then(res => res.json())
     .then(data => {
+
         if (data.success) {
-            // حذفها من الواجهة مباشرة
             this.materials = this.materials.filter(x => x.id !== m.id);
+            this.showTransferModal = false;
             alert(data.message);
         } else {
-            alert('فشل الحذف');
+            alert(data.message || 'فشل العملية');
         }
-    })
-    .catch(() => {
-        alert('حدث خطأ في الاتصال بالسيرفر');
     });
+},
+
+confirmTransfer() {
+
+    if (!this.selectedNewOffering) {
+        alert('يجب اختيار عرض بديل');
+        return;
+    }
+
+    this.forceDelete(this.currentDeletingMaterial, this.selectedNewOffering);
 },
 
 filteredBySemester() {
@@ -302,7 +378,6 @@ filteredAvailable() {
     const sectionId = this.selectedSections;
     const semId = this.selectedSemester;
     const used = new Set(this.assignedList().map(x => x.code));
-alart(semId);
     let result = this.materials
         .filter(m => Number(m.section_id) === Number(sectionId) &&
                      Number(m.semester_id) === Number(semId))

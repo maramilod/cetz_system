@@ -48,12 +48,13 @@ private function semesterPackagesCount(): int
 }
 
 
- private function topCards()
+
+private function topCards()
 {
     return [
-        'students' => Student::count(),
-        'teachers' => Teacher::count(),
-        'courses'  => Course::count(),
+        'students' => DB::table('students')->count(),
+        'teachers' => DB::table('teachers')->count(),
+        'courses'  => DB::table('courses')->count(),
         'semester_packages' => $this->semesterPackagesCount(),
     ];
 }
@@ -100,34 +101,44 @@ private function semesterPackagesCount(): int
 
     /* ===================== المواد + نسب النجاح ===================== */
 
-    private function coursesStats(): array
-    {
-        return Course::withCount([
-            'offerings as total_offerings',
-        ])->get()->map(function ($course) {
+  private function coursesStats(): array
+{
+    $stats = DB::table('enrollments as e')
+        ->join('course_offerings as co', 'e.course_offering_id', '=', 'co.id')
+        ->select(
+            'co.course_id',
+            DB::raw('count(*) as total'),
+            DB::raw("sum(e.status = 'passed') as passed"),
+            DB::raw("sum(e.status = 'failed') as failed"),
+            DB::raw("sum(e.is_deprived = 1) as deprived")
+        )
+        ->groupBy('co.course_id')
+        ->get()
+        ->keyBy('course_id');
 
-            $enrollments = Enrollment::whereHas('courseOffering', function ($q) use ($course) {
-                $q->where('course_id', $course->id);
-            });
+    return Course::select('id', 'name')
+        ->get()
+        ->map(function ($course) use ($stats) {
+
+            $s = $stats[$course->id] ?? null;
+
+            $total = $s?->total ?? 0;
+            $passed = $s?->passed ?? 0;
 
             return [
                 'course_id'   => $course->id,
                 'course_name' => $course->name,
-
                 'enrollments' => [
-                    'total'     => $enrollments->count(),
-                    'passed'    => (clone $enrollments)->where('status', 'passed')->count(),
-                    'failed'    => (clone $enrollments)->where('status', 'failed')->count(),
-                    'deprived'  => (clone $enrollments)->where('is_deprived', true)->count(),
+                    'total'    => $total,
+                    'passed'   => $passed,
+                    'failed'   => $s?->failed ?? 0,
+                    'deprived' => $s?->deprived ?? 0,
                 ],
-
-                'success_rate' => $this->percentage(
-                    (clone $enrollments)->where('status', 'passed')->count(),
-                    $enrollments->count()
-                ),
+                'success_rate' => $this->percentage($passed, $total),
             ];
         })->toArray();
-    }
+}
+
 
     /* ===================== الأساتذة ===================== */
 
@@ -155,32 +166,33 @@ private function semesterPackagesCount(): int
 
 private function extraStats(): array
 {
-    $droppedCourses = CourseOffering::with('course')
-        ->where('status', 'dropped')
-        ->get();
-
     return [
-        'dropped_courses' => $droppedCourses->count(),
-        'dropped_courses_list' => $droppedCourses->map(function($offering) {
-            return [
-                'course_id' => $offering->course_id,
-                'course_name' => $offering->course->name ?? 'غير معروف',
-            ];
-        })->toArray(),
+        'dropped_courses' => DB::table('course_offerings')
+            ->where('status', 'dropped')
+            ->count(),
 
-        'active_semesters'=> DB::table('semesters')->where('active', true)->count(),
+        'dropped_courses_list' => DB::table('course_offerings as co')
+            ->join('courses as c', 'co.course_id', '=', 'c.id')
+            ->where('co.status', 'dropped')
+            ->select('c.id as course_id', 'c.name as course_name')
+            ->get()
+            ->toArray(),
+
+        'active_semesters' => DB::table('semesters')->where('active', 1)->count(),
 
         'gender_distribution' => [
-            'male'   => Student::where('gender', 'ذكر')->count(),
-            'female' => Student::where('gender', 'انثى')->count(),
+            'male'   => DB::table('students')->where('gender', 'ذكر')->count(),
+            'female' => DB::table('students')->where('gender', 'انثى')->count(),
         ],
-        'nationality_distribution' => Student::select('nationality', DB::raw('count(*) as total'))
-    ->groupBy('nationality')
-    ->pluck('total', 'nationality'),
 
+        'nationality_distribution' =>
+            DB::table('students')
+                ->select('nationality', DB::raw('count(*) as total'))
+                ->groupBy('nationality')
+                ->pluck('total', 'nationality'),
     ];
-    
 }
+
 
 
     /* ===================== Helper ===================== */

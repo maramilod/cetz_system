@@ -19,13 +19,15 @@ public function index(Request $request)
         return redirect()->back()->with('error', 'لا يوجد فصل دراسي مفعّل حالياً.');
     }
 
-    // جلب المواد المطروحة في جميع الفصول المفعّلة
-    $courseOfferingsQuery = CourseOffering::with([
-        'course',
-        'section',
-        'teachingAssignments.teacher',
-        'enrollments.student'
-    ])->whereIn('semester_id', $activeSemesterIds);
+$courseOfferingsQuery = CourseOffering::with([
+    'course',
+    'section',
+    'semester',
+    'teachingAssignments.teacher',
+    'enrollments' => function($q) {
+        $q->where('status', 'in_progress')->with('student');
+    }
+])->whereIn('semester_id', $activeSemesterIds);
 
     // فلترة حسب المادة
     if ($request->filled('course_offering_id')) {
@@ -43,7 +45,6 @@ public function index(Request $request)
         'role' => $ta->role ?? 'غير محدد',
     ];
 });
-
 
         $students = $co->enrollments
             ->where('status', 'in_progress')

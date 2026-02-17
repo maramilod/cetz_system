@@ -68,37 +68,74 @@ public function updateStatus(Request $request, $id)
 
 public function excel()
 {
-    $students = Student::with('department')->get();
+    /**
+     * 1️⃣ جلب الطلاب مع القسم (أعمدة محددة فقط)
+     */
+    $students = Student::select([
+            'id',
+            'full_name',
+            'mother_name',
+            'nationality',
+            'gender',
+            'registration_year',
+            'academic_term',
+            'student_number',
+            'manual_number',
+            'national_id',
+            'passport_number',
+            'bank_name',
+            'account_number',
+            'dob',
+            'family_record',
+            'department_id',
+        ])
+        ->with('department:id,name')
+        ->get();
 
-    // سنوات التسجيل من قاعدة البيانات
-    $years = Student::select('registration_year')->distinct()->orderBy('registration_year', 'desc')->pluck('registration_year');
+    /**
+     * 2️⃣ سنوات التسجيل
+     */
+    $years = Student::select('registration_year')
+        ->distinct()
+        ->orderByDesc('registration_year')
+        ->pluck('registration_year');
 
-    // الأقسام
-    $departments = Department::pluck('name');
+    /**
+     * 3️⃣ الأقسام
+     */
+    $departments = Department::orderBy('name')->pluck('name');
 
+    /**
+     * 4️⃣ نفس الفورمات القديم (للواجهة)
+     */
     $studentsForJs = $students->map(function ($s) {
         return [
-            'id' => $s->id,
-            'full_name' => $s->full_name,
-            'mother_name' => $s->mother_name,
-            'nationality' => $s->nationality,
-            'gender' => $s->gender,
-            'year' => $s->registration_year,
-            'semester' => $s->academic_term,
-            'student_number' => $s->student_number,
-            'manual_number' => $s->manual_number,
-            'national_id' => $s->national_id,
+            'id'              => $s->id,
+            'full_name'       => $s->full_name,
+            'mother_name'     => $s->mother_name,
+            'nationality'     => $s->nationality,
+            'gender'          => $s->gender,
+            'year'            => $s->registration_year,
+            'semester'        => $s->academic_term,
+            'student_number'  => $s->student_number,
+            'manual_number'   => $s->manual_number,
+            'national_id'     => $s->national_id,
             'passport_number' => $s->passport_number,
-            'bank_name' => $s->bank_name,
-            'bank_account' => $s->account_number,
-            'birth_date' => $s->dob,
-            'family_record' => $s->family_record,
-            'department' => $s->department?->name,
+            'bank_name'       => $s->bank_name,
+            'bank_account'    => $s->account_number,
+            'birth_date'      => $s->dob,
+            'family_record'   => $s->family_record,
+            'department'      => $s->department?->name,
         ];
     });
 
-    return view('students.excel', compact('studentsForJs', 'years', 'departments'));
+    return view('students.excel', compact(
+        'studentsForJs',
+        'years',
+        'departments'
+    ));
 }
+
 
 
     public function show(Student $student)
