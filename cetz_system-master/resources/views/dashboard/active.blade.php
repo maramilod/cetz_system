@@ -27,8 +27,7 @@
 </div>
 
 {{-- Chart.js --}}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
+<script src="{{ asset('js/chart.min.js') }}"></script><script>
 document.addEventListener('DOMContentLoaded', () => {
     // ===== بيانات الطلاب لكل مادة =====
     const courseLabels = @json($studentsPerCourse->pluck('course_name'));

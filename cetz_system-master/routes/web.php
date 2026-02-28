@@ -114,7 +114,7 @@ Route::get('/dashboard/active', [DashboardAnalyticsController::class, 'activeVie
 
     Route::get('/teachers/{teacher}/promotion', [TeacherController::class, 'promotionForm'])
     ->name('teachers.promotion')
-    ->middleware(PermissionMiddleware::class.':teachers.update');
+    ->middleware(PermissionMiddleware::class.':teachers.rank.store');
 
 Route::post('/teachers/{teacher}/promotion',
     [TeacherRankController::class, 'store']
@@ -325,9 +325,9 @@ Route::prefix('data-management')->name('data.')->group(function () {
 
     // حفظ رقم المعهد (POST)
     Route::post('institute-number', [InstituteController::class, 'saveNumber'])
-        ->name('save-institute-number');
+        ->name('save-institute-number')->middleware(PermissionMiddleware::class.':institute.saveNumber');;;
     // حفظ البيانات العامة
-    Route::post('save-institute-info', [InstituteController::class, 'saveInfo'])->name('save-institute-info');
+    Route::post('save-institute-info', [InstituteController::class, 'saveInfo'])->name('save-institute-info')->middleware(PermissionMiddleware::class.':institute.saveInfo');;
 
     Route::view('institute-number', 'data_management.institute-number')->name('institute-number'); 
     Route::view('institute-info', 'data_management.institute-info')->name('institute-info');

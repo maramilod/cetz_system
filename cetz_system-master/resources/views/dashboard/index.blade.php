@@ -99,8 +99,7 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
+<script src="{{ asset('js/chart.min.js') }}"></script><script>
 document.addEventListener('DOMContentLoaded', async () => {
     const response = await fetch('/dashboard/analytics');
     const data = await response.json();

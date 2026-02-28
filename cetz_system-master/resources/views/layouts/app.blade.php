@@ -6,7 +6,7 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Language" content="ar">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="{{ asset('fonts/tajawal.css') }}" rel="stylesheet">
   <title>{{ config('app.name', 'نظام الكلية') }}</title>
   @vite('resources/css/app.css')
   @vite('resources/js/app.js')

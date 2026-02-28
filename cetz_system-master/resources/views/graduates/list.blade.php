@@ -53,8 +53,7 @@
         </div>
     </div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
+<script src="{{ asset('js/xlsx.full.js') }}"></script><script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('graduatesList', () => ({
             dataset: [

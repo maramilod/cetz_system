@@ -210,8 +210,7 @@
 </div>
 
 {{-- JS للتصدير والطباعة --}}
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script>
+<script src="{{ asset('js/xlsx.min.js') }}"></script><script>
 function showGradeDetails(enrollment) {
     const tbody = document.getElementById('gradeDetails');
     tbody.innerHTML = '';

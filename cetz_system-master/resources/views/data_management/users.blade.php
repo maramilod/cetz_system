@@ -63,11 +63,13 @@
                 <input type="text" x-model="newUser.full_name" placeholder="الاسم الكامل" class="border rounded w-full px-2 py-1 mb-2" required>
                 <input type="email" x-model="newUser.email" placeholder="البريد الإلكتروني" class="border rounded w-full px-2 py-1 mb-2" required>
                 <input type="password" x-model="newUser.password" placeholder="كلمة المرور" class="border rounded w-full px-2 py-1 mb-2" required>
-                <select x-model="newUser.role_id" class="border rounded w-full px-2 py-1 mb-2" required>
-                    <template x-for="role in roles" :key="role.id">
-                        <option :value="role.id" x-text="role.display_name"></option>
-                    </template>
-                </select>
+              <select x-model="newUser.role_id" class="border rounded w-full px-2 py-1 mb-2" required>
+    <option value="">اختر دور</option> <!-- الخيار الافتراضي -->
+    <template x-for="role in roles" :key="role.id">
+        <option :value="role.id" x-text="role.display_name"></option>
+    </template>
+</select>
+
                 
                 <select x-model="newUser.is_active" class="border rounded w-full px-2 py-1 mb-2">
                     <option :value="true">نشط</option>

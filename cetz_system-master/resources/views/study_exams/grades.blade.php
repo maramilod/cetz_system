@@ -57,8 +57,7 @@
         </div>
     </div>
 </div>
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script>
+<script src="{{ asset('js/xlsx.full.min.js') }}"></script><script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('studySemesterResults', () => ({
             dataset: [
