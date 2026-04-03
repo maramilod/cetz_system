@@ -1,7 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="space-y-6" x-data="studentsList(@js($studentsForJs), @js($years), @js($departments))"
+
+
+
+<div class="space-y-6" x-data="studentsList(@js($studentsForJs), @js($years), @js($departments), @js($availableTerms))"
      x-init="applyFilters()">
     <div class="bg-white rounded-lg shadow p-6 space-y-4">
         <h1 class="text-2xl font-bold">كشف الطلبة</h1>
@@ -48,13 +51,22 @@
                 <label class="block text-sm text-gray-600 mb-1">تاريخ الميلاد</label>
                 <input type="date" x-model="filters.birth_date" @change="applyFilters" class="border rounded px-3 py-2 w-full">
             </div>
-
+            
+<div>
+    <label class="block text-sm text-gray-600 mb-1">الفصل الدراسي</label>
+    <select x-model="filters.academic_term" @change="applyFilters" class="border rounded px-3 py-2 w-full">
+    <option value="">الكل</option>
+    @foreach($availableTerms as $term)
+        <option value="{{ $term }}">{{ $term }}</option>
+    @endforeach
+</select>
+</div>
             <div>
                 <label class="block text-sm text-gray-600 mb-1">الجنس</label>
                 <select x-model="filters.gender" @change="applyFilters" class="border rounded px-3 py-2 w-full">
                     <option value="">الكل</option>
                     <option value="ذكر">ذكر</option>
-                    <option value="أنثى">أنثى</option>
+                    <option value="انثى">أنثى</option>
                 </select>
             </div>
 
@@ -68,10 +80,7 @@
                 </datalist>
             </div>
 
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">الفصل الدراسي</label>
-                <input type="text" x-model.trim="filters.semester" @input.debounce.300="applyFilters" class="border rounded px-3 py-2 w-full" placeholder="مثلاً: مستجد او خريف">
-            </div>
+ 
 
             <div>
                 <label class="block text-sm text-gray-600 mb-1">اسم المصرف</label>
@@ -87,8 +96,18 @@
                 <label class="block text-sm text-gray-600 mb-1">قيد الكتيب</label>
                 <input type="text" x-model.trim="filters.family_record" @input.debounce.300="applyFilters" class="border rounded px-3 py-2 w-full" placeholder="بحث بقيد الكتيب">
             </div>
-        </div>
+        
+<div>
+    <label class="block text-sm text-gray-600 mb-1">القسم</label>
+    <select x-model="filters.department" @change="applyFilters" class="border rounded px-3 py-2 w-full">
+        <option value="">الكل</option>
+        <template x-for="dept in departments" :key="dept">
+            <option :value="dept" x-text="dept"></option>
+        </template>
+    </select>
+</div>
 
+</div>
         <!-- أزرار -->
         <div class="flex justify-end gap-2 mt-3">
             <button type="button" class="h-10 px-4 bg-gray-200 rounded" @click="resetFilters">♻️ إعادة تعيين</button>
@@ -140,25 +159,28 @@
 
 <script src="{{ asset('js/xlsx.full.min.js') }}"></script><script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('studentsList', (datasetFromDb, yearsFromDb, departmentsFromDb) => ({
+    Alpine.data('studentsList', (datasetFromDb, yearsFromDb, departmentsFromDb,semestersFromDb) => ({
         dataset: datasetFromDb,
         years: yearsFromDb,
         departments: departmentsFromDb,
+        semesters: semestersFromDb,
+
 
         columns: {
             full_name: 'الاسم الكامل',
             mother_name: 'اسم الأم',
             nationality: 'الجنسية',
             year: 'سنة التسجيل',
-            semester: 'الفصل الدراسي',
             student_number: 'الرقم الجامعي',
             national_id: 'الرقم الوطني',
             passport_number: 'رقم جواز السفر',
             bank_name: 'اسم المصرف',
+            academic_term: '',
             bank_account: 'رقم الحساب المصرفي',
             birth_date: 'تاريخ الميلاد',
             family_record: 'قيد الكتيب',
             department: 'القسم'
+            
         },
 
         visibleColumns: [
@@ -176,7 +198,6 @@ document.addEventListener('alpine:init', () => {
             birth_date: '',
             gender: '',
             year: '',
-            semester: '',
             bank_name: '',
             bank_account: '',
             family_record: '',
@@ -191,13 +212,26 @@ document.addEventListener('alpine:init', () => {
         },
 
         applyFilters() {
-            this.records = this.dataset.filter(row => {
-                return Object.keys(this.filters).every(key => {
-                    if (!this.filters[key]) return true;
-                    return row[key]?.toString().toLowerCase().includes(this.filters[key].toString().toLowerCase());
-                });
-            });
-        },
+    this.records = this.dataset.filter(student => {
+        return Object.keys(this.filters).every(key => {
+            const filterValue = this.filters[key];
+
+            // إذا الفلتر فارغ، نمر
+            if (!filterValue) return true;
+
+            // فلتر الفصل الدراسي
+            if (key === 'academic_term') {
+                // نتحقق إذا الطالب لديه هذا الفصل ضمن academic_terms
+                return student.academic_terms.some(term =>
+                    (term.year + ' ' + term.term_type) === filterValue
+                );
+            }
+
+            // بقية الفلاتر التقليدية
+            return student[key]?.toString().toLowerCase().includes(filterValue.toString().toLowerCase());
+        });
+    });
+},
 
         exportExcel() {
             if (!this.records.length) return alert('لا توجد بيانات لتصديرها.');

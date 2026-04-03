@@ -155,6 +155,8 @@ Route::post('/teachers/{teacher}/promotion',
     Route::patch('/courses/{id}/restore', [CourseController::class, 'restore'])
     ->name('courses.restore')->middleware(PermissionMiddleware::class.':courses.restore');
 Route::get('/course-offerings/{id}/alternatives', [CourseController::class, 'alternatives']);
+    Route::get('/course-offerings/{id}/has-enrollments', [CourseController::class, 'hasEnrollments']);
+
 
 
 Route::get('/courses/{course}/edit', [CourseController::class, 'edit'])->name('courses.edit');
@@ -264,6 +266,8 @@ Route::put('/courses/{id}/update-basic', [CourseController::class, 'updateBasic'
     | Download Materials _ Enrollments
     |--------------------------------------------------------------------------
 */
+Route::get('/download-materials/search-autocomplete', [MaterialDownloadController::class, 'searchAutocomplete']);
+
     Route::get('download-materials/print', [MaterialDownloadController::class, 'print'])->name('materials.download.print');
     Route::get('download-materials', [MaterialDownloadController::class, 'index'])->name('materials.download');
 // routes/web.php

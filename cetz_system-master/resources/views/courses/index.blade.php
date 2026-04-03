@@ -264,24 +264,34 @@ restoreMaterial(m) {
     });
 },
 deleteMaterial(m) {
+    if (!confirm(`هل أنت متأكد من حذف المادة "${m.name}"؟`)) return;
 
-    if (!confirm(`تحذير!\nسيتم حذف المادة "${m.name}"`)) return;
-
-    fetch(`/course-offerings/${m.id}/alternatives`)
+    // 1️⃣ تحقق إذا المادة مرتبطة بطلاب
+    fetch(`/course-offerings/${m.id}/has-enrollments`)
         .then(res => res.json())
-        .then(data => {
+        .then(hasEnrollments => {
 
-            if (data.length > 0) {
-                // يوجد تسجيلات → افتح المودل
-                this.alternativeOfferings = data;
-                this.currentDeletingMaterial = m;
-                this.showTransferModal = true;
+            if (!hasEnrollments) {
+                // لا يوجد طلاب → حذف مباشر
+                this.forceDelete(m, null, true);
             } else {
-                // لا يوجد تسجيلات → حذف مباشر
-                this.forceDelete(m, null);
+                // يوجد طلاب → جلب العروض البديلة
+                fetch(`/course-offerings/${m.id}/alternatives`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.length > 0) {
+                            // فتح المودال
+                            this.alternativeOfferings = data;
+                            this.currentDeletingMaterial = m;
+                            this.showTransferModal = true;
+                        } else {
+                            alert("يوجد طلاب مسجلين، لكن لا توجد عروض بديلة لنقلهم!");
+                        }
+                    });
             }
         });
-},
+}
+,
 forceDelete(m, newOfferingId) {
 
     fetch(`/courses/${m.id}`, {

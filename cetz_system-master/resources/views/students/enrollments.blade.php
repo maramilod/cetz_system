@@ -4,10 +4,33 @@
 <div class="max-w-7xl mx-auto p-6">
     {{-- نموذج البحث عن الطالب --}}
     <form action="{{ route('students.enrollments') }}" method="GET" class="mb-6 flex gap-2 items-center">
-        <input type="text" name="student_number" placeholder="رقم القيد أو الاسم"
-               value="{{ request('student_number') }}"
-               class="border rounded px-3 py-2 w-64"
-               required>
+        <div x-data="studentSearchBox()" class="relative">
+    
+    <input type="text"
+           x-model="search"
+           @input.debounce.300="searchStudents()"
+           @focus="open = true"
+           @click.outside="open = false"
+           placeholder="ابحث بالاسم أو الرقم"
+           class="border rounded px-3 py-2 w-64">
+
+    <!-- القيمة الفعلية التي سترسل -->
+    <input type="hidden" name="student_number" :value="selectedNumber">
+
+    <!-- النتائج -->
+    <div x-show="open && results.length"
+         class="absolute z-50 bg-white border w-full mt-1 max-h-60 overflow-auto rounded shadow">
+
+        <template x-for="s in results" :key="s.id">
+            <div @mousedown.prevent="select(s)"
+                 class="px-3 py-2 hover:bg-gray-100 cursor-pointer">
+                <span x-text="s.full_name"></span>
+                -
+                <span x-text="s.student_number"></span>
+            </div>
+        </template>
+    </div>
+</div>
         <button type="submit" 
                 class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
             عرض كشف المواد
@@ -38,6 +61,16 @@
         class="bg-yellow-600 hover:bg-yellow-800 text-white px-4 py-2 rounded">
     طباعة الفصل الحالي 
 </button>
+
+   @foreach($semesterEnrollments->groupBy(fn($s) => $s['year'].'_'.$s['term_type']) as $key => $group)
+        @php
+            $semester = $group->first();
+        @endphp
+        <button onclick="printSemester('{{ $semester['year'] }}','{{ $semester['term_type'] }}')"
+                class="bg-yellow-500 hover:bg-yellow-700 text-white px-4 py-2 rounded">
+            طباعة الفصل: {{ $semester['term_type'] }} {{ $semester['year'] }}
+        </button>
+    @endforeach
 
     </div>
 
@@ -208,7 +241,46 @@
         <tr><td colspan="6">لا توجد مواد للطباعة</td></tr>
     @endforelse
 </div>
+<script>
+function studentSearchBox() {
+    return {
+        search: '',
+        results: [],
+        open: false,
+        selectedNumber: '',
 
+        searchStudents() {
+            const val = this.search.trim();
+
+            if (val.length < 2) {
+                this.results = [];
+                return;
+            }
+
+            fetch(`/download-materials/search-autocomplete?query=${encodeURIComponent(val)}`)
+                .then(res => res.json())
+                .then(data => {
+                    this.results = data;
+                    this.open = true;
+                })
+                .catch(err => console.error(err));
+        },
+
+   select(student) {
+    this.search = `${student.full_name} - ${student.student_number}`;
+    this.selectedNumber = student.student_number;
+
+    this.open = false;
+    this.results = [];
+
+    // انتظر DOM ليتحدث قبل الإرسال
+    setTimeout(() => {
+        this.$el.closest('form').submit();
+    }, 50); 
+}
+    }
+}
+</script>
 {{-- JS للتصدير والطباعة --}}
 <script src="{{ asset('js/xlsx.min.js') }}"></script><script>
 function showGradeDetails(enrollment) {
@@ -380,6 +452,109 @@ win.document.close();
 win.focus();
 win.print();
 win.close();
+}
+function printSemester(year, termType) {
+    const tables = Array.from(document.querySelectorAll('#printTables table'))
+                        .filter(t => t.dataset.year === year && t.dataset.term_type === termType);
+
+    if (!tables.length) {
+        alert('لا توجد مواد لهذا الفصل');
+        return;
+    }
+
+    let headers = [];
+    let rows = [];
+    let totalUnits = 0;
+    let totalHours = 0;
+    let totalGrades = 0;
+    let countedGrades = 0;
+
+    tables.forEach((table, tableIndex) => {
+        if (tableIndex === 0) {
+            headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+        }
+
+        table.querySelectorAll('tbody tr').forEach(tr => {
+            const tds = Array.from(tr.querySelectorAll('td'));
+            if (!tds.length) return;
+            if (tds[0].innerText.includes('مجاميع')) return;
+
+            rows.push(tds.map(td => td.innerText.trim()));
+
+            totalUnits += parseFloat(tds[2].innerText) || 0;
+            totalHours += parseFloat(tds[3].innerText) || 0;
+
+            if (tds[4].innerText && tds[4].innerText !== '-') {
+                totalGrades += parseFloat(tds[4].innerText) || 0;
+                countedGrades++;
+            }
+        });
+    });
+
+    const avgGrades = countedGrades ? (totalGrades / countedGrades).toFixed(2) : '-';
+
+    let tableHtml = `
+        <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;direction:rtl;margin-bottom:100px;">
+            <thead>
+                <tr>
+                    ${headers.map(h => `<th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;">${h}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(r => `<tr>${r.map(c => `<td style="border:1px solid #ccc;padding:8px;text-align:center;">${c}</td>`).join('')}</tr>`).join('')}
+                <tr style="font-weight:bold;background:#d1ffd1;">
+                    <td colspan="2" style="text-align:right;border:1px solid #ccc;">المجموع</td>
+                    <td style="border:1px solid #ccc;text-align:center;">${totalUnits}</td>
+                    <td style="border:1px solid #ccc;text-align:center;">${totalHours}</td>
+                    <td style="border:1px solid #ccc;text-align:center;">${avgGrades}</td>
+                    <td style="border:1px solid #ccc;"></td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
+    const signaturesHtml = `
+        <div style="position: fixed; bottom: 50px; width: 100%; display: flex; justify-content: space-between; font-family: Arial;">
+            <div style="text-align:center;">
+                <p>_____________________</p>
+                <p>قسم الدراسة والامتحانات</p>
+            </div>
+            <div style="text-align:center;">
+                <p>_____________________</p>
+                <p>المسجل العام</p>
+            </div>
+        </div>
+    `;
+
+    const studentName = "{{ $student->full_name }}";
+
+    const win = window.open('', '_blank', 'width=900,height=1200');
+    win.document.write(`
+        <html>
+        <head>
+            <title>كشف درجات الفصل</title>
+            <style>
+                @page { size: A4; margin: 50px; }
+                body { font-family: Arial; direction: rtl; margin:0; padding:0; }
+                h1 { text-align: center; margin-bottom: 20px; }
+                table th, table td { border:1px solid #ccc; padding:6px; text-align:center; }
+                table th { background-color:#f0f0f0; }
+                table tr:last-child td { font-weight:bold; background-color:#d1ffd1; }
+            </style>
+        </head>
+        <body>
+            <h1>كشف درجات الفصل: ${termType} ${year}</h1>
+            <h2 style="text-align:center;">${studentName}</h2>
+            ${tableHtml}
+            ${signaturesHtml}
+        </body>
+        </html>
+    `);
+
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
 }
 function printActiveSemester() {
       const tables = document.querySelectorAll('#printTables table[data-active="1"]');

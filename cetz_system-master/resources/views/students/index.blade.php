@@ -43,11 +43,7 @@ $deptList = array_values(array_unique(array_map(fn($r)=>$r['department'], $all))
                 </template>
             </select>
             <input type="text" x-model.trim="filters.search" @input.debounce.300="applyFilters" placeholder="ابحث بالاسم أو رقم القيد" class="border rounded p-2 flex-1 min-w-[240px]" />
-            <select x-model="filters.status" @change="applyFilters" class="border rounded p-2">
-                <option value="all">الكل</option>
-                <option value="active">نشط</option>
-                <option value="graduated">خريج</option>
-            </select>
+         
         </div>
 
         <!-- جدول الطلاب -->
@@ -81,8 +77,24 @@ $deptList = array_values(array_unique(array_map(fn($r)=>$r['department'], $all))
                             <td class="p-2" x-text="s.current_status"></td>
                             <td class="p-2" x-text="s.dob"></td>
                             <td class="p-2">
-                                <span class="px-2 py-1 rounded text-xs" :class="s.status==='graduated' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'" x-text="s.status==='graduated' ? 'خريج' : 'نشط'"></span>
-                            </td>
+<td class="p-2 text-center">
+    <span
+        class="px-2 py-1 rounded text-xs"
+        :class="s.current_status === 'متخرج' ? 'bg-green-100 text-green-700' :
+                (s.current_status === 'منقطع' ? 'bg-red-100 text-red-700' :
+                'bg-blue-100 text-blue-700')"
+        x-text="s.current_status === 'متخرج' ? 'خريج' :
+                (s.current_status === 'منقطع' ? 'منقطع' : 'نشط')">
+    </span>
+
+    <!-- زر لتغيير الحالة إلى منقطع -->
+   <button
+        @click="s.current_status === 'منقطع' ? restoreStatus(s) : changeStatusToDropped(s)"
+        class="ml-2 px-2 py-1 text-xs rounded"
+        :class="s.current_status === 'منقطع' ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-red-500 text-white hover:bg-red-600'">
+        <span x-text="s.current_status === 'منقطع' ? 'إزالة الانقطاع' : 'جعل منقطع'"></span>
+    </button>
+</td>
                             <td class="p-2 space-x-2 rtl:space-x-reverse">
                                 <a :href="studentShowUrl(s)" class="text-blue-600">عرض</a>
                                 <a :href="studentEditUrl(s)" class="px-2 py-1 bg-yellow-100 rounded">تعديل</a>
@@ -136,6 +148,34 @@ document.addEventListener('alpine:init', () => {
                 return okDept && okStatus && okTerm;
             });
         },
+changeStatusToDropped(s) {
+    this.updateStatus(s, 'منقطع');
+},
+
+restoreStatus(s) {
+    this.updateStatus(s, 'جاهز للتجديد');
+},
+
+updateStatus(s, status) {
+    s.current_status = status; // تحديث فوراً في واجهة المستخدم
+
+    // إرسال AJAX لتحديث قاعدة البيانات
+    fetch(`/enrollments/${s.id}/update-status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ status })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success) {
+            alert('حدث خطأ أثناء تحديث الحالة');
+        }
+    })
+    .catch(() => alert('حدث خطأ أثناء التحديث'));
+},
 
         studentShowUrl(s){
             return '/students/' + s.id;

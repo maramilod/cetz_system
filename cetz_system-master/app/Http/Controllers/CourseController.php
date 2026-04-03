@@ -17,33 +17,85 @@ use App\Models\CourseOffering;
 
 class CourseController extends Controller
 {
+public function hasEnrollments($id)
+{
+    // استخدام exists() أسرع من count
+    $exists = Enrollment::where('course_offering_id', $id)->exists();
+    return response()->json($exists);
+}
+
 public function alternatives($id)
 {
-    $offering = CourseOffering::findOrFail($id);
+    $offering = CourseOffering::with('section', 'course', 'semester')->findOrFail($id);
 
-  
-   // إحضار جميع العروض الأخرى لنفس الشعبة والمادة ونفس السنة الدراسية
-    $alternatives = CourseOffering::where('section_id', $offering->section_id)
-                        ->where('course_id', $offering->course_id)
-                        ->whereHas('semester', function($q) use ($offering) {
-                            $q->where('start_date', $offering->semester->start_date)
-                              ->where('end_date', $offering->semester->end_date);
-                        })
-                        ->where('id', '!=', $id)
-                        ->get();
-    $result = $alternatives->map(function($o){
-        return [
+    $alternatives = CourseOffering::with(['section','course','semester'])
+        ->where('section_id', $offering->section_id)
+        ->whereHas('semester', function($q) use ($offering) {
+            $q->where('start_date', $offering->semester->start_date)
+              ->where('end_date', $offering->semester->end_date);
+        })
+        ->where('id', '!=', $id)
+        ->get()
+        ->map(fn($o) => [
             'id' => $o->id,
             'section_name' => $o->section->name ?? 'غير معروف',
             'semester_name' => $o->semester->label ?? $o->semester->name ?? 'غير معروف',
-            'course_name' => $o->course->name ?? 'غير معروف',   // ✅ اسم المادة
-            'course_code' => $o->course->course_code ?? '',     // ✅ رمز المادة
-        ];
-    });
+            'course_name' => $o->course->name ?? 'غير معروف',
+            'course_code' => $o->course->course_code ?? '',
+        ]);
 
-    return response()->json($result);
+    return response()->json($alternatives);
 }
 
+public function destroy(Request $request, $id)
+{
+    return DB::transaction(function () use ($request, $id) {
+
+        $offering = CourseOffering::with('course','semester')->findOrFail($id);
+
+        $enrollmentsQuery = Enrollment::where('course_offering_id', $offering->id);
+
+        // استخدام exists() أسرع من count()
+        $hasEnrollments = $enrollmentsQuery->exists();
+
+        if ($hasEnrollments) {
+            if (!$request->new_offering_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'يوجد طلاب مسجلين. يرجى اختيار عرض بديل.'
+                ], 422);
+            }
+
+            $newOffering = CourseOffering::with('course','semester')->findOrFail($request->new_offering_id);
+
+            // 🛑 منع تكرار تسجيل الطالب بشكل أسرع باستخدام collect
+            $enrollments = $enrollmentsQuery->get();
+            $studentIds = $enrollments->pluck('student_id');
+
+            $alreadyExists = Enrollment::whereIn('student_id', $studentIds)
+                ->where('course_offering_id', $newOffering->id)
+                ->exists();
+
+            if ($alreadyExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'بعض الطلاب مسجلين مسبقاً في العرض الجديد.'
+                ], 422);
+            }
+
+            // 🔁 نقل التسجيلات
+            $enrollmentsQuery->update(['course_offering_id' => $newOffering->id]);
+        }
+
+        // حذف المادة
+        $offering->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم نقل التسجيلات وحذف العرض بنجاح'
+        ]);
+    });
+}
 
 
 public function drop($id)
@@ -72,64 +124,6 @@ public function restore($id)
         'success' => true,
         'message' => 'تم إلغاء إسقاط المادة'
     ]);
-}
-   public function destroy(Request $request, $id)
-{
-    return DB::transaction(function () use ($request, $id) {
-
-        $offering = CourseOffering::with('course','semester')
-            ->findOrFail($id);
-
-        $enrollments = Enrollment::where('course_offering_id', $offering->id);
-
-        if ($enrollments->count() > 0) {
-
-            if (!$request->new_offering_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'يوجد طلاب مسجلين. يرجى اختيار عرض بديل.'
-                ], 422);
-            }
-
-            $newOffering = CourseOffering::with('course','semester')
-                ->findOrFail($request->new_offering_id);
-
-            // 🛑 تحقق مهم: نفس المادة فقط
-            if ($offering->course_id !== $newOffering->course_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'لا يمكن نقل التسجيلات إلى مادة مختلفة.'
-                ], 422);
-            }
-
-            // 🛑 منع تكرار تسجيل الطالب
-            foreach ($enrollments->get() as $enrollment) {
-
-                $alreadyExists = Enrollment::where('student_id', $enrollment->student_id)
-                    ->where('course_offering_id', $newOffering->id)
-                    ->exists();
-
-                if ($alreadyExists) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'بعض الطلاب مسجلين مسبقاً في العرض الجديد.'
-                    ], 422);
-                }
-            }
-
-            // 🔁 نقل التسجيلات
-            $enrollments->update([
-                'course_offering_id' => $newOffering->id
-            ]);
-        }
-
-        $offering->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'تم نقل التسجيلات وحذف العرض بنجاح'
-        ]);
-    });
 }
     public function index()
 {
@@ -270,6 +264,7 @@ public function getSemestersByDateRange(Request $request)
 }
 public function store(Request $request)
 {
+    //dd(json_decode($request->selectedSections, true));
     // 1️⃣ التحقق من صحة البيانات
     $request->validate([
         'name' => 'required|string|max:255',
@@ -324,22 +319,24 @@ public function store(Request $request)
         if (!$section) continue;
 
         // ✅ القسم العام: شعبة واحدة وسيمستر واحد باسم "عام"
-        if ($section->department->is_general) {
-            $semester = Semester::firstOrCreate([
-                'semester_number' => 1,
-                'term_type' => 'عام',
-                'start_date' => $request->start_date,
-                'end_date' => $request->end_date,
-            ]);
+      if ($section->department->is_general) {
 
+        $semesters = Semester::where('name', 'العام')
+            ->whereBetween('start_date', [$request->start_date, $request->end_date])
+            ->get();
+
+        // ربط المادة بكل هذه السيمسترات
+        foreach ($semesters as $semester) {
             CourseOffering::create([
                 'course_id' => $course->id,
                 'section_id' => $sectionId,
                 'semester_id' => $semester->id,
             ]);
-
-            continue; // تخطي باقي الكود للشعب العادية
         }
+
+        continue; // نتخطى الشعب العادية
+    }
+    
 
         // ✅ الشعب العادية
         foreach ($sectionData['semesters'] as $semesterNumber => $isSelected) {
@@ -363,54 +360,15 @@ public function store(Request $request)
     return redirect()->back()->with('success', 'تم إضافة المادة بنجاح');
 }
 
-public function edit(Course $course)
+public function edit($id)
 {
-    $departments = Department::where('is_active', 1)->get();
-    $sections    = Section::where('is_active', 1)->get();
-    $courses     = Course::where('id', '!=', $course->id)->get();
+    // جلب المادة الحالية
+    $course = Course::findOrFail($id);
 
-    $startDates = Semester::select('start_date')
-        ->distinct()
-        ->orderBy('start_date')
-        ->pluck('start_date');
+    // جلب كل المواد (لاستخدامها في dropdown المادة السابقة)
+    $courses = Course::where('id', '!=', $id)->get();
 
-    $endDates = Semester::select('end_date')
-        ->whereNotNull('end_date')
-        ->distinct()
-        ->orderBy('end_date')
-        ->pluck('end_date');
-
-    // 🔹 جلب العروض الحالية للمادة
-    $offerings = CourseOffering::with('semester')
-        ->where('course_id', $course->id)
-        ->get();
-
-    // 🔹 تحويلها لصيغة selectedSections
-    $selectedSections = [];
-
-    foreach ($offerings as $offering) {
-        $sectionId = $offering->section_id;
-        $semesterNumber = $offering->semester->semester_number;
-
-        if (!isset($selectedSections[$sectionId])) {
-            $selectedSections[$sectionId] = [
-                'selected' => true,
-                'semesters' => []
-            ];
-        }
-
-        $selectedSections[$sectionId]['semesters'][$semesterNumber] = true;
-    }
-
-    return view('courses.edit', compact(
-        'course',
-        'courses',
-        'departments',
-        'sections',
-        'startDates',
-        'endDates',
-        'selectedSections'
-    ));
+    return view('courses.edit', compact('course', 'courses'));
 }
 
 public function update(Request $request, $id)

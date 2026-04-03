@@ -110,11 +110,12 @@
             @foreach($departments as $dept)
             <div class="border rounded p-4 mb-4">
 
-              <!-- القسم -->
+             <!-- القسم -->
 <label class="flex items-center gap-2">
     <input type="checkbox"
        value="{{ $dept->id }}"
-       data-section-id="{{ $dept->is_general ? $dept->sections->first()->id : '' }}"
+       data-section-id="{{ $dept->is_general ? $dept->sections->where('name','العام')->first()?->id : '' }}"
+         @click="initSection('{{ $dept->is_general ? $dept->sections->where('name','العام')->first()?->id : '' }}')"
        x-model="selectedDepartments"
        @change="handleGeneralDept({{ $dept->id }}, {{ $dept->is_general ? 'true' : 'false' }})">
 

@@ -8,14 +8,29 @@
     <div class="bg-white rounded-lg shadow p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
 
         <!-- إدخال رقم الطالب -->
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">رقم الطالب (جامعي / يدوي)</label>
-            <input type="text"
-                   x-model="studentNumberInput"
-                   @input.debounce.300="onStudentNumberInput()"
-                   placeholder="أدخل الرقم"
-                   class="border rounded px-3 py-2 w-full">
-        </div>
+       <div class="relative">
+    <input type="text"
+           x-model="studentSearch"
+           @input.debounce.300="searchStudents()"
+           @focus="openDropdown = true"
+           @click.outside="openDropdown = false"
+           placeholder="ابحث بالاسم أو الرقم"
+           class="border rounded px-3 py-2 w-full">
+
+    <!-- القائمة المنسدلة -->
+    <div x-show="openDropdown && searchResults.length"
+         class="absolute z-50 bg-white border w-full mt-1 max-h-60 overflow-auto rounded shadow">
+
+        <template x-for="s in searchResults" :key="s.id">
+            <div @click="selectStudent(s)"
+                 class="px-3 py-2 hover:bg-gray-100 cursor-pointer">
+                <span x-text="s.full_name"></span>
+                -
+                <span x-text="s.student_number"></span>
+            </div>
+        </template>
+    </div>
+</div>
 
         <!-- الشعبة -->
         <div>
@@ -142,15 +157,44 @@ function csrf() {
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('materialsAssign', () => ({
+        studentSearch: '',
+searchResults: [],
+openDropdown: false,
         studentNumberInput: '',
         selectedStudent: null,
         selectedSemester: '',
         searchAvailable: '',
         materials: [],
         availableSemesters: [],
+searchStudents() {
+    const val = this.studentSearch.trim();
 
-        onStudentNumberInput() {
-            const val = this.studentNumberInput.trim();
+   if (val.length < 2) {
+    this.searchResults = [];
+    return;
+}
+
+    fetch(`/download-materials/search-autocomplete?query=${encodeURIComponent(val)}`)
+        .then(res => res.json())
+        .then(data => {
+            this.searchResults = data;
+            this.openDropdown = true;
+        })
+        .catch(err => console.error(err));
+},
+selectStudent(student) {
+    this.studentSearch = `${student.full_name} - ${student.student_number}`;
+    this.openDropdown = false;
+    this.searchResults = [];
+
+    this.onStudentNumberInput(student.student_number);
+},
+    onStudentNumberInput(number = null) {
+    const val = (number ?? this.studentNumberInput).trim();
+      console.log('🔵 onStudentNumberInput CALLED');
+    console.log('➡️ number param:', number);
+    console.log('➡️ studentNumberInput:', this.studentNumberInput);
+    console.log('✅ final val:', val);
             if (!val) {
                 this.selectedStudent = null;
                 this.selectedSemester = '';

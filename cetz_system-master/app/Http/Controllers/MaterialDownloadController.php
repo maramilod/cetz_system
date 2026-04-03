@@ -16,7 +16,18 @@ public function index()
 {
     return view('materials.download');
 }
+public function searchAutocomplete(Request $request)
+{
+    $query = $request->query('query');
 
+    return Student::where('current_status', '!=', 'منقطع') // استبعاد المنقطعين
+        ->where(function ($q) use ($query) {
+            $q->where('full_name', 'like', "%$query%")
+              ->orWhere('student_number', 'like', "%$query%");
+        })
+        ->limit(10)
+        ->get(['id', 'full_name', 'student_number']);
+}
 public function search(Request $request)
 {
     $query = trim($request->input('query'));
