@@ -1,0 +1,7 @@
+{
+    "passed": "ناجح",
+    "failed": "راسب",
+    "in_progress": "قيد الدراسة",
+    "equivalent": "معادلة",
+    "unknown": "غير محدد"
+}
